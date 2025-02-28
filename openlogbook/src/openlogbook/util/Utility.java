@@ -17,7 +17,21 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.SimpleTimeZone;
+import java.util.TimeZone;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 
 /**
@@ -27,7 +41,7 @@ import java.util.SimpleTimeZone;
  * @author KC0ZPS
  */
 public class Utility {
-   static private final SimpleTimeZone   _utcTimeZone = new SimpleTimeZone(0, "UTC") ;
+   static private final TimeZone _utcTimeZone = TimeZone.getTimeZone("UTC");
    static private final SimpleDateFormat _dateFormat = new SimpleDateFormat("MM/dd/yyyy") ;
    static private final SimpleDateFormat _timeFormat = new SimpleDateFormat("H:mm:ss") ;
    static private final SimpleDateFormat _adifDateFormat = new SimpleDateFormat("yyyyMMdd") ;
@@ -141,7 +155,7 @@ public class Utility {
     * Loads properties from a given file
     *
     * @param filename name of properties file to load.
-    * @param optionsDialogBox The options dialog box whos parameters will be saved to the file.
+    * @param optionsDialogBox The options dialog box whose parameters will be saved to the file.
     *
     * @exception FileNotFoundException if the properties file does not exist
     * @exception IOException if an IO error occurs reading the file
@@ -150,112 +164,110 @@ public class Utility {
    throws IOException, FileNotFoundException {
       File inputFile = new File(filename);
       FileReader fileReader = new FileReader(inputFile);
-      BufferedReader  bufferedReader = new BufferedReader (fileReader);
-      String inputString = new String() ;
-      LogEntry logEntry = DefaultLogBookFactory.createLogEntry() ;
-      while((inputString = bufferedReader.readLine()) != null) {
-         StringBuffer buffer = new StringBuffer(inputString) ;
-         
+      BufferedReader bufferedReader = new BufferedReader(fileReader);
+      String inputString;
+      LogEntry logEntry = DefaultLogBookFactory.createLogEntry();
+      while ((inputString = bufferedReader.readLine()) != null) {
+         StringBuilder buffer = new StringBuilder(inputString);
+
          // File History
-         int length = KEY_FILE.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_FILE)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            addFileHistory(new File(file)) ;
+         int length = KEY_FILE.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_FILE)) {
+            String file = buffer.substring(length, buffer.length());
+            addFileHistory(new File(file));
          }
-         
+
          // Column
-         length = KEY_COLUMN.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_COLUMN)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            Integer intValue = new Integer(file) ;
-            TableColumnEnum tableColumnEnum = 
-               (TableColumnEnum)TableColumnEnum.getIntToTableColumnType().getObjectValue(intValue.intValue()) ;
-            optionsDialogBox.addColumn(tableColumnEnum) ;
+         length = KEY_COLUMN.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_COLUMN)) {
+            String file = buffer.substring(length, buffer.length());
+            Integer intValue = Integer.valueOf(file);
+            TableColumnEnum tableColumnEnum =
+               (TableColumnEnum) TableColumnEnum.getIntToTableColumnType().getObjectValue(intValue);
+            optionsDialogBox.addColumn(tableColumnEnum);
          }
-         
+
          // Default Values
-         length = KEY_OPERATOR.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_OPERATOR)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            logEntry.getCallsign().setOperatingStation(file) ;
+         length = KEY_OPERATOR.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_OPERATOR)) {
+            String file = buffer.substring(length, buffer.length());
+            logEntry.getCallsign().setOperatingStation(file);
          }
 
-         
-         length = KEY_BAND.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_BAND)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            Integer value = new Integer(file) ;
-            Band band = (Band)Band.getIntToBandType().getObjectValue(value) ;
-            logEntry.getFrequencyInformation().setBand(band) ;
-         }
-         
-         length = KEY_MODE.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_MODE)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            Integer value = new Integer(file) ;
-            Mode mode = (Mode)Mode.getIntToModeType().getObjectValue(value) ;
-            logEntry.getFrequencyInformation().setMode(mode) ; 
+         length = KEY_BAND.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_BAND)) {
+            String file = buffer.substring(length, buffer.length());
+            Integer value = Integer.valueOf(file);
+            Band band = (Band) Band.getIntToBandType().getObjectValue(value);
+            logEntry.getFrequencyInformation().setBand(band);
          }
 
-         length = KEY_TX_POWER.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_TX_POWER)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            Integer value = new Integer(file) ;
-            logEntry.getFrequencyInformation().setTxPower(value) ;
+         length = KEY_MODE.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_MODE)) {
+            String file = buffer.substring(length, buffer.length());
+            Integer value = Integer.valueOf(file);
+            Mode mode = (Mode) Mode.getIntToModeType().getObjectValue(value);
+            logEntry.getFrequencyInformation().setMode(mode);
          }
 
-         length = KEY_RX_POWER.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_RX_POWER)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            Integer value = new Integer(file) ;
-            logEntry.getFrequencyInformation().setRxPower(value) ;
+         length = KEY_TX_POWER.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_TX_POWER)) {
+            String file = buffer.substring(length, buffer.length());
+            Integer value = Integer.valueOf(file);
+            logEntry.getFrequencyInformation().setTxPower(value);
          }
 
-         length = KEY_RST_RECEIVED.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_RST_RECEIVED)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            logEntry.getRst().setRstReceived(file) ;
+         length = KEY_RX_POWER.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_RX_POWER)) {
+            String file = buffer.substring(length, buffer.length());
+            Integer value = Integer.valueOf(file);
+            logEntry.getFrequencyInformation().setRxPower(value);
          }
 
-         length = KEY_RST_SENT.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_RST_SENT)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            logEntry.getRst().setRstSent(file) ;
+         length = KEY_RST_RECEIVED.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_RST_RECEIVED)) {
+            String file = buffer.substring(length, buffer.length());
+            logEntry.getRst().setRstReceived(file);
          }
-         
+
+         length = KEY_RST_SENT.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_RST_SENT)) {
+            String file = buffer.substring(length, buffer.length());
+            logEntry.getRst().setRstSent(file);
+         }
+
          // Theme
-         length = KEY_IS_CUSTOM_THEME.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_IS_CUSTOM_THEME)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            Boolean isCustomTheme = Boolean.parseBoolean(file) ;
-            optionsDialogBox.setIsCustomTheme(isCustomTheme) ;
+         length = KEY_IS_CUSTOM_THEME.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_IS_CUSTOM_THEME)) {
+            String file = buffer.substring(length, buffer.length());
+            Boolean isCustomTheme = Boolean.parseBoolean(file);
+            optionsDialogBox.setIsCustomTheme(isCustomTheme);
          }
 
-         length = KEY_CUSTOM_THEME.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_CUSTOM_THEME)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            optionsDialogBox.setSelectedTheme(file) ;
-         }
-         
-         length = KEY_XTRA_SCROLL.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_XTRA_SCROLL)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            Boolean isXtraScrollbars = Boolean.parseBoolean(file) ;
-            optionsDialogBox.setIsXtraScrollbars(isXtraScrollbars) ;
+         length = KEY_CUSTOM_THEME.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_CUSTOM_THEME)) {
+            String file = buffer.substring(length, buffer.length());
+            optionsDialogBox.setSelectedTheme(file);
          }
 
-         length = KEY_BACKGROUND.length() ;
-         if (buffer.length() > length && buffer.substring(0,length).equals(KEY_BACKGROUND)) {
-            String file = buffer.substring(length, buffer.length()) ;
-            Boolean isBackground = Boolean.parseBoolean(file) ;
-            optionsDialogBox.setIsDesktopBackground(isBackground) ;
+         length = KEY_XTRA_SCROLL.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_XTRA_SCROLL)) {
+            String file = buffer.substring(length, buffer.length());
+            Boolean isXtraScrollbars = Boolean.parseBoolean(file);
+            optionsDialogBox.setIsXtraScrollbars(isXtraScrollbars);
          }
 
-       }
-      
-       optionsDialogBox.setDefaultLogEntry(logEntry) ;
-    }
- 
+         length = KEY_BACKGROUND.length();
+         if (buffer.length() > length && buffer.substring(0, length).equals(KEY_BACKGROUND)) {
+            String file = buffer.substring(length, buffer.length());
+            Boolean isBackground = Boolean.parseBoolean(file);
+            optionsDialogBox.setIsDesktopBackground(isBackground);
+         }
+      }
+
+      optionsDialogBox.setDefaultLogEntry(logEntry);
+   }
+
    /**
     * Writes to the file.
     *
@@ -274,7 +286,7 @@ public class Utility {
          }
 
          // Column
-         ArrayList<TableColumnEnum> list = optionsDialogBox.getColumnList() ;
+         ArrayList<TableColumnEnum> list = optionsDialogBox.getColumnList();
          int size = list.size() ;
          for (int index = 0; index < size; index++) {
             TableColumnEnum tableColumnEnum = (TableColumnEnum)list.get(index) ;
@@ -322,9 +334,10 @@ public class Utility {
     * 
     * @return a UTC SimpleTimeZone.
     */
-   static public SimpleTimeZone getUtcTimeZone() {
-      return _utcTimeZone ;
-   }
+    static public TimeZone getUtcTimeZone() {
+      return TimeZone.getTimeZone("UTC"); 
+  }
+  
    
    /**
     * Gets a SimpleDateFormat for displaying dates.

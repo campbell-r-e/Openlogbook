@@ -12,6 +12,14 @@ import openlogbook.jlog.util.QslRequest;
 import java.io.File;
 import java.io.IOException;
 import java.util.Date;
+import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.TransformerException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -22,6 +30,7 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+//import openlogbook.jlogimpl.constants.XmlConstants;
 
 /** 
  * This main function of this class is to save LogBook to an XML file.  However, it has
@@ -279,55 +288,55 @@ public class ParseXmlFile implements ReadData {
     */
    private void createLogEntry(String nodeName, String nodeValue, LogEntry logEntry) 
    throws NumberFormatException {
-      if (nodeName.equals(XmlConstants.Station.toString())) {
+      if (nodeName.equals("Station")) {
          logEntry.getCallsign().setContactStation(nodeValue) ;
-      } else if (nodeName.equals(XmlConstants.StartDate.toString())) {
+      } else if (nodeName.equals("StartDate")) {
          Long value = new Long(nodeValue) ;
          Date date = new Date(value) ;
          logEntry.getEra().setStartDate(date) ;
-      } else if (nodeName.equals(XmlConstants.EndDate.toString())) {
+      } else if (nodeName.equals("EndDate")) {
          Long value = new Long(nodeValue) ;
          Date date = new Date(value) ;
          logEntry.getEra().setEndDate(date) ;
-      } else if (nodeName.equals(XmlConstants.SameAsStart.toString())) {
+      } else if (nodeName.equals("SameAsStart")) {
          // logEntry.getEra().setDateSameAsStart(new Boolean(nodeValue)) ; 
-      } else if (nodeName.equals(XmlConstants.Mode.toString())) {
+      } else if (nodeName.equals("Mode")) {
          Integer value = new Integer(nodeValue) ;
          Mode mode = (Mode)Mode.getIntToModeType().getObjectValue(value) ;
          logEntry.getFrequencyInformation().setMode(mode) ; 
-      } else if (nodeName.equals(XmlConstants.Band.toString())) {
+      } else if (nodeName.equals("Band")) {
          Integer value = new Integer(nodeValue) ;
          Band band = (Band)Band.getIntToBandType().getObjectValue(value) ;
          logEntry.getFrequencyInformation().setBand(band) ;
-      } else if (nodeName.equals(XmlConstants.Frequency.toString())) {
+      } else if (nodeName.equals("Frequency")) {
          logEntry.getFrequencyInformation().setFrequency(nodeValue) ; 
-      } else if (nodeName.equals(XmlConstants.Power.toString())) {
+      } else if (nodeName.equals("Power")) {
          Integer value = new Integer(nodeValue) ;
          logEntry.getFrequencyInformation().setTxPower(value) ;
-      } else if (nodeName.equals(XmlConstants.Locator.toString())) {
+      } else if (nodeName.equals("Locator")) {
          // logEntry.getMisc().setLocator(nodeValue) ;
-      } else if (nodeName.equals(XmlConstants.Comment.toString())) {
+      } else if (nodeName.equals("Comment")) {
          logEntry.getMisc().setComment(nodeValue) ;
-      } else if (nodeName.equals(XmlConstants.RstReceived.toString())) {
+      } else if (nodeName.equals("RstReceived")) {
          logEntry.getRst().setRstReceived(nodeValue) ;
-      } else if (nodeName.equals(XmlConstants.RstSent.toString())) {
+      } else if (nodeName.equals("RstSent")) {
          logEntry.getRst().setRstSent(nodeValue) ;
-      } else if (nodeName.equals(XmlConstants.County.toString())) {
+      } else if (nodeName.equals("County")) {
          logEntry.getContactAddress().setCounty(nodeValue) ;
-      } else if (nodeName.equals(XmlConstants.Name.toString())) {
+      } else if (nodeName.equals("Name")) {
          logEntry.getContactAddress().setName(nodeValue) ;
-      } else if (nodeName.equals(XmlConstants.Address.toString())) {
+      } else if (nodeName.equals("Address")) {
          logEntry.getContactAddress().setAddress(nodeValue) ;
-      } else if (nodeName.equals(XmlConstants.QTH.toString())) {
+      } else if (nodeName.equals("QTH")) {
          logEntry.getContactStationInformation().setQth(nodeValue) ;
-      } else if (nodeName.equals(XmlConstants.IOTA1.toString())) {
+      } else if (nodeName.equals("IOTA1")) {
          Integer value = new Integer(nodeValue) ;
          IotaEnum iotaEnum = (IotaEnum)IotaEnum.getIntToIotaType().getObjectValue(value) ;
          logEntry.getContactStationInformation().getIota().setIotaEnum(iotaEnum) ;
-      } else if (nodeName.equals(XmlConstants.IOTA2.toString())) {
+      } else if (nodeName.equals("IOTA2")) {
          Integer value = new Integer(nodeValue) ;
          logEntry.getContactStationInformation().getIota().setValue(value) ;
-      } else if (nodeName.equals(XmlConstants.QslReceived.toString())) {
+      } else if (nodeName.equals("QslReceived")) {
          Boolean value = Boolean.parseBoolean(nodeValue) ;
          QslRequest qslRequest ;
          if (value.equals(Boolean.TRUE)) {
@@ -336,11 +345,11 @@ public class ParseXmlFile implements ReadData {
             qslRequest = QslRequest.No ;            
          }
          logEntry.getQsl().setQslReceived(qslRequest) ;
-      } else if (nodeName.equals(XmlConstants.QslReceivedDate.toString())) {
+      } else if (nodeName.equals("QslReceivedDate")) {
          Long value = new Long(nodeValue) ;
          Date date = new Date(value) ;
          logEntry.getQsl().setQslReceivedDate(date) ;
-      } else if (nodeName.equals(XmlConstants.QslSent.toString())) {
+      } else if (nodeName.equals("QslSent")) {
          Boolean value = Boolean.parseBoolean(nodeValue) ;
          QslRequest qslRequest ;
          if (value.equals(Boolean.TRUE)) {
@@ -349,7 +358,7 @@ public class ParseXmlFile implements ReadData {
             qslRequest = QslRequest.No ;            
          }
          logEntry.getQsl().setQslSent(qslRequest) ;
-      } else if (nodeName.equals(XmlConstants.QslSentDate.toString())) {
+      } else if (nodeName.equals("QslSentDate")) {
          Long value = new Long(nodeValue) ;
          Date date = new Date(value) ;
          logEntry.getQsl().setQslSentDate(date) ;

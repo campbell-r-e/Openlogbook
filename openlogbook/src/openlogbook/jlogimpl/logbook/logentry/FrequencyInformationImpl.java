@@ -199,4 +199,9 @@ public class FrequencyInformationImpl implements FrequencyInformation {
       return buffer.toString() ;
    }
 
+   public void setBand(String bandString) {
+      // TODO Auto-generated method stub
+      throw new UnsupportedOperationException("Unimplemented method 'setBand'");
+   }
+
 }

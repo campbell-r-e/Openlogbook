@@ -3,15 +3,13 @@ plugins {
     id 'application'
 }
 
-
+group = 'com.example.openlogbook'
 version = '1.0'
 
-
-sourceSets.main.java.srcDirs = ['src']
+sourceSets.main.java.srcDirs = ['src']  // Ensure 'src' is correct, or change to 'src/openlogbook' if needed
 
 def distDir = 'openlogbook/openlogbook/release'
 def libDir = 'lib'
-
 
 tasks.named('clean') {
     delete layout.buildDirectory
@@ -25,11 +23,9 @@ repositories {
 }
 
 dependencies {
-    implementation files("$libDir/ecs-1.4.2.jar")
     implementation files("$libDir/skinlf.jar")
     implementation files("$libDir/SizeOf.jar")
 }
-
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
@@ -37,7 +33,6 @@ tasks.withType(JavaCompile).configureEach {
     targetCompatibility = JavaVersion.VERSION_1_8
     classpath = files(fileTree(dir: libDir, includes: ['*.jar']))
 }
-
 
 task copyIniFile(type: Copy) {
     from 'src/main/resources'
@@ -51,8 +46,7 @@ task runnableJar(type: Jar) {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {
         attributes(
-            'Main-Class': 'openlogbook.Genesis',  
-            'Class-Path': configurations.runtimeClasspath.files.collect { it.name }.join(' ')  // Ensure dependencies load correctly
+            'Main-Class': 'openlogbook.Genesis'  // Ensure the main class is correctly referenced
         )
     }
     from {
@@ -74,5 +68,5 @@ tasks.named('javadoc') {
 
 // Run the application
 application {
-    mainClass = 'openlogbook.Genesis'  
+    mainClass = 'openlogbook.Genesis'  // Ensure this matches the correct package structure
 }
