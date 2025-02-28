@@ -12,7 +12,7 @@ import openlogbook.jlog.logbook.jlogentry.Qsl;
 import openlogbook.jlog.logbook.jlogentry.Rst;
 import openlogbook.jlog.util.Band;
 import openlogbook.jlog.util.IotaEnum;
-import openlogbook.jlog.util.Mode;
+
 import openlogbook.jlog.util.QslRequest;
 
 import java.io.File;
@@ -20,9 +20,16 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 
-import org.apache.ecs.xml.XML;
-import org.apache.ecs.xml.XMLDocument;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.*;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
+import org.apache.ecs.xml.XML;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 
 
@@ -37,6 +44,7 @@ public class SaveXmlFile implements SaveData {
   
    private File    _file ;
    private LogBook _logBook ;
+
    
    /**
     * Creates a new instance of a SaveXmlFile.
@@ -58,9 +66,15 @@ public class SaveXmlFile implements SaveData {
     * 
     * @throws FileNotFoundException if the file cannot be found.  This is needed because this
     * method uses FileOutputStream.
-    */
-   public void execute() throws FileNotFoundException {
-      XMLDocument document = new XMLDocument() ;
+        * @throws ParserConfigurationException 
+            * @throws TransformerException 
+                */
+               public void execute() throws FileNotFoundException, ParserConfigurationException, TransformerException {
+      DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+      DocumentBuilder builder = factory.newDocumentBuilder();
+      Document doc = builder.newDocument();
+      Element rootElement = doc.createElement("Logbook");
+      doc.appendChild(rootElement);
       
       XML logBookXml = new XML("LogBook") ; 
 
@@ -69,17 +83,26 @@ public class SaveXmlFile implements SaveData {
       ArrayList<LogEntry> list = _logBook.getLogEntries() ;
       for (int index = 0; index < list.size(); index++) {
          LogEntry entry = list.get(index) ;
+         Element log=createLogEntry(entry);
          
-         logBookXml.addElement(createLogEntry(entry)) ;
+         doc.appendChild(log);
+         
       }
       
-      document.addElement(logBookXml) ;         
+      Element logBook = doc.createElement("LogBook");  // Equivalent to logBookXml
+      rootElement.appendChild(logBook);    
+             
+             
       
       FileOutputStream stream = new FileOutputStream(_file) ;
       
       System.out.println("Saving to " + _file.getAbsolutePath()) ;
       
-      document.output(stream) ;
+      TransformerFactory transformerFactory = TransformerFactory.newInstance();
+      Transformer transformer = transformerFactory.newTransformer();
+      transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+
+      transformer.transform(new DOMSource(doc), new StreamResult(System.out));
       
       // document.output(System.out) ;
    }
@@ -94,130 +117,168 @@ public class SaveXmlFile implements SaveData {
     * @param entry The log entry to create the XML object from.
     * 
     * @return An XML object representing the log entry.
-    */
-   private XML createLogEntry(LogEntry entry) {
-      XML logEntryXml = new XML("LogEntry") ;
+        * @throws ParserConfigurationException 
+        */
+       private Element createLogEntry(LogEntry entry) throws ParserConfigurationException {
+      DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+      DocumentBuilder builder = factory.newDocumentBuilder();
+      Document doc = builder.newDocument();
+
+      // Root element <LogEntry>
+      Element logEntry = doc.createElement("LogEntry");
+      doc.appendChild(logEntry);
       
       // Station
-      XML node = new XML(XmlConstants.Station.toString()) ;
-      node.addElement(entry.getCallsign().getContactStation()) ;
-      logEntryXml.addElement(node) ;
+      Element station = doc.createElement("Station");
+      station.appendChild(doc.createTextNode(entry.getCallsign().getContactStation()));
+      logEntry.appendChild(station);
+     
       
       // Date
       Era era = entry.getEra() ;
-      node = new XML(XmlConstants.StartDate.toString()) ;
-      node.addElement("" + era.getStartDate().getTime()) ;
-      logEntryXml.addElement(node) ;
+      Element StartDate = doc.createElement(XmlConstants.StartDate.toString());
+      StartDate.appendChild(doc.createTextNode(String.valueOf(era.getStartDate().getTime())));
 
-      node = new XML(XmlConstants.EndDate.toString()) ;
-      node.addElement("" + era.getEndDate().getTime()) ;
-      logEntryXml.addElement(node) ;
+      logEntry.appendChild(StartDate);
 
-      node = new XML(XmlConstants.SameAsStart.toString()) ;
-      // node.addElement(new Boolean(era.isDateSameAsStart()).toString()) ;
-      logEntryXml.addElement(node) ;
+    //
+     
+    Element endDate = doc.createElement(XmlConstants.EndDate.toString());
+    endDate.appendChild(doc.createTextNode(String.valueOf(era.getEndDate().getTime())));
 
-      // Frequency Information
-      FrequencyInformation freqInfo = entry.getFrequencyInformation() ;
-      node = new XML(XmlConstants.Mode.toString()) ;
-      int value = Mode.getIntToModeType().getIntValue(freqInfo.getMode()) ;
-      node.addElement("" + value) ;
-      logEntryXml.addElement(node) ;
-
-      node = new XML(XmlConstants.Band.toString()) ;
-      value = Band.getIntToBandType().getIntValue(freqInfo.getBand()) ; 
-      node.addElement("" + value) ;
-      logEntryXml.addElement(node) ;
-
-      node = new XML(XmlConstants.Frequency.toString()) ;
-      node.addElement(freqInfo.getFrequency()) ;
-      logEntryXml.addElement(node) ;
-
-      node = new XML(XmlConstants.Power.toString()) ;
-      node.addElement("" + freqInfo.getTxPower()) ;
-      logEntryXml.addElement(node) ;
+    logEntry.appendChild(endDate);
+    
+     
+    
+    Element sameAsStart = doc.createElement("SameAsStart");
+    boolean isSameAsStart = era.getStartDate().getTime() == era.getEndDate().getTime();
+    sameAsStart.appendChild(doc.createTextNode(String.valueOf(isSameAsStart)));
+    logEntry.appendChild(sameAsStart);
+    
       
-      // Misc
-      Misc misc = entry.getMisc() ;
-      node = new XML(XmlConstants.Locator.toString()) ;
-      // node.addElement(misc.getLocator()) ;
-      logEntryXml.addElement(node) ;
+   //
+     
+      // Frequency
+      FrequencyInformation freqInfo = entry.getFrequencyInformation();
+    Element frequencyElement = doc.createElement(XmlConstants.Frequency.toString());
+    frequencyElement.appendChild(doc.createTextNode(String.valueOf(freqInfo.getFrequency()))); 
+    logEntry.appendChild(frequencyElement);
+   
 
-      node = new XML(XmlConstants.Comment.toString()) ;
-      node.addElement(misc.getComment()) ;
-      logEntryXml.addElement(node) ;
+    // Mode
+    Element mode = doc.createElement(XmlConstants.Mode.toString());
+    mode.appendChild(doc.createTextNode(""+freqInfo.getMode().toString())); 
+   logEntry.appendChild(mode);
+    //Band
 
-      // RST
-      Rst rst = entry.getRst() ;
-      node = new XML(XmlConstants.RstReceived.toString()) ;
-      node.addElement(rst.getRstReceived()) ;
-      logEntryXml.addElement(node) ;
+    // Create <Band> element
+    Element bandElement = doc.createElement(XmlConstants.Band.toString());
 
-      node = new XML(XmlConstants.RstSent.toString()) ;
-      node.addElement(rst.getRstSent()) ;
-      logEntryXml.addElement(node.toString()) ;
+   // Convert Band type to integer (same logic as old code)
+   int value = Band.getIntToBandType().getIntValue(freqInfo.getBand());
 
-      // Address
-      ContactAddress contactAddress = entry.getContactAddress() ;
-      node = new XML(XmlConstants.County.toString()) ;
-      node.addElement(contactAddress.getCounty()) ;
-      logEntryXml.addElement(node) ;
+   // Append value as text inside <Band>
+   bandElement.appendChild(doc.createTextNode(String.valueOf(value)));
 
-      node = new XML(XmlConstants.Name.toString()) ;
-      node.addElement(contactAddress.getName()) ;
-      logEntryXml.addElement(node) ;
+   // Attach <Band> to <LogEntry>
+   logEntry.appendChild(bandElement);
 
-      node = new XML(XmlConstants.Address.toString()) ;
-      node.addElement(contactAddress.getAddress()) ;
-      logEntryXml.addElement(node) ;
+  //Power 
+  Element TXpower =doc.createElement(XmlConstants.Power.toString());
+
+  int tx = freqInfo.getTxPower();
+  TXpower.appendChild(doc.createTextNode(String.valueOf(tx)));
+  logEntry.appendChild(TXpower);
+
+  //misc 
+  Misc misc = entry.getMisc();
+  Element locatorElement=doc.createElement(XmlConstants.Locator.toString());
+  // could be added misc.getLocator()
+  //locatorElement.appendChild(doc.createTextNode(misc.getLocator()));
+
+  //logEntry.appendChild(locatorElement);
+
+
+
+  // Comments 
+  Element Comment = doc.createElement(XmlConstants.Comment.toString());
+  Comment.appendChild(doc.createTextNode(misc.getComment()));
+  Comment.appendChild(Comment);
+ // RST Recieved
+ Rst rst = entry.getRst();
+ Element RstReceived = doc.createElement(XmlConstants.RstReceived.toString());
+ RstReceived.appendChild(doc.createTextNode(rst.getRstReceived()));
+ RstReceived.appendChild(RstReceived);
+
+ // RST Sent
+ Element RstSent = doc.createElement(XmlConstants.RstSent.toString());
+ RstSent.appendChild(doc.createTextNode(rst.getRstSent()));
+ RstSent.appendChild(RstSent);
+
+// Address data 
+ContactAddress contactAddress = entry.getContactAddress() ;
+Element ContactCounty = doc.createElement(XmlConstants.County.toString());
+ContactCounty.appendChild(doc.createTextNode(contactAddress.getCounty()));
+ContactCounty.appendChild(ContactCounty);
+//Contact name 
+Element ContactName= doc.createElement(XmlConstants.Name.toString());
+ContactName.appendChild(doc.createTextNode(contactAddress.getName()));
+ContactName.appendChild(ContactName);
+// Adress
+Element Address = doc.createElement(XmlConstants.Address.toString());
+Address.appendChild(doc.createTextNode(contactAddress.getAddress()));
+Address.appendChild(Address);
+// Basic Contact Station Information
+ContactStationInformation contactStationInformation = entry.getContactStationInformation() ;
+Element QTH =doc.createElement(XmlConstants.QTH.toString());
+QTH.appendChild(doc.createTextNode(contactStationInformation.getQth()));
+QTH.appendChild(QTH);
+// IOTA1
+Element iota1Element = doc.createElement(XmlConstants.IOTA1.toString());
+IotaEnum iotaEnum = contactStationInformation.getIota().getIotaEnum();
+int iota1Value = IotaEnum.getIntToIotaType().getIntValue(iotaEnum);
+iota1Element.appendChild(doc.createTextNode(String.valueOf(iota1Value)));
+logEntry.appendChild(iota1Element);
+
+// IOTA2
+Element iota2Element = doc.createElement(XmlConstants.IOTA2.toString());
+iota2Element.appendChild(doc.createTextNode(String.valueOf(contactStationInformation.getIota().getValue())));
+logEntry.appendChild(iota2Element);
+
+// QSL
+Qsl qsl = entry.getQsl();
+
+// QslSent
+Element qslSentElement = doc.createElement(XmlConstants.QslSent.toString());
+if (qsl.isQslSent().equals(QslRequest.Yes) || qsl.isQslSent().equals(QslRequest.Requested)) {
+    qslSentElement.appendChild(doc.createTextNode("true"));
+} else {
+    qslSentElement.appendChild(doc.createTextNode("false"));
+}
+logEntry.appendChild(qslSentElement);
+
+// QslSentDate
+Element qslSentDateElement = doc.createElement(XmlConstants.QslSentDate.toString());
+qslSentDateElement.appendChild(doc.createTextNode(String.valueOf(qsl.getQslSentDate().getTime())));
+logEntry.appendChild(qslSentDateElement);
+
+// QslReceived
+Element qslReceivedElement = doc.createElement(XmlConstants.QslReceived.toString());
+if (qsl.isQslReceived().equals(QslRequest.Yes) || qsl.isQslReceived().equals(QslRequest.Requested)) {
+    qslReceivedElement.appendChild(doc.createTextNode("true"));
+} else {
+    qslReceivedElement.appendChild(doc.createTextNode("false"));
+}
+logEntry.appendChild(qslReceivedElement);
+
+// QslReceivedDate
+Element qslReceivedDateElement = doc.createElement(XmlConstants.QslReceivedDate.toString());
+qslReceivedDateElement.appendChild(doc.createTextNode(String.valueOf(qsl.getQslReceivedDate().getTime())));
+logEntry.appendChild(qslReceivedDateElement);
+return logEntry;
+
+     
       
-      // Basic Contact Station Information
-      ContactStationInformation contactStationInformation = entry.getContactStationInformation() ;
-      node = new XML(XmlConstants.QTH.toString()) ;
-      node.addElement(contactStationInformation.getQth()) ;
-      logEntryXml.addElement(node) ;
-
-      node = new XML(XmlConstants.IOTA1.toString()) ;
-      IotaEnum iotaEnum = contactStationInformation.getIota().getIotaEnum() ;
-      value = IotaEnum.getIntToIotaType().getIntValue(iotaEnum) ;
-      node.addElement("" + value) ;
-      logEntryXml.addElement(node) ;
-
-      node = new XML(XmlConstants.IOTA2.toString()) ;
-      node.addElement("" + contactStationInformation.getIota().getValue()) ;
-      logEntryXml.addElement(node) ;         
-      
-      // QSL
-      Qsl qsl = entry.getQsl() ;
-      node = new XML(XmlConstants.QslSent.toString()) ;
-      if(qsl.isQslSent().equals(QslRequest.Yes)) {
-         node.addElement("true") ;            
-      } else if(qsl.isQslSent().equals(QslRequest.Requested)) {
-         node.addElement("true") ;                        
-      } else {
-         node.addElement("false") ;            
-      }
-      logEntryXml.addElement(node) ;
-
-      node = new XML(XmlConstants.QslSentDate.toString()) ;
-      node.addElement("" + qsl.getQslSentDate().getTime()) ;
-      logEntryXml.addElement(node) ;
-         
-      node = new XML(XmlConstants.QslReceived.toString()) ;
-      if(qsl.isQslReceived().equals(QslRequest.Yes)) {
-         node.addElement("true") ;            
-      } else if(qsl.isQslSent().equals(QslRequest.Requested)) {
-         node.addElement("true") ;                        
-      } else {
-         node.addElement("false") ;            
-      }
-      logEntryXml.addElement(node) ;
-
-      node = new XML(XmlConstants.QslReceivedDate.toString()) ;
-      node.addElement("" + qsl.getQslReceivedDate().getTime()) ;
-      logEntryXml.addElement(node) ;
-      
-      return logEntryXml ;
    }
    
 }

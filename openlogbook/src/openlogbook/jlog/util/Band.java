@@ -67,7 +67,7 @@ public class Band {
    
    private String                    _description ;
 
-   public static final Band Blank    = new Band("") ;
+   public static final String Blank    = new Band("") ;
    public static final Band Unknown  = new Band("Unknown") ;
    public static final Band _2190m   = new Band("2190m") ;
    public static final Band _160m    = new Band("160m") ;

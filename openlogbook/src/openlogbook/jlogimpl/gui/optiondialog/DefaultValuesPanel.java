@@ -39,7 +39,7 @@ public class DefaultValuesPanel extends JPanel {
    private JTextField _sentTextField = new JTextField() ;
    private JTextField _operatorTextField = new JTextField() ;
 
-   private Band    _band ;
+   private String    _band ;
    private Mode    _mode ;
    private Integer _txPower ;
    private Integer _rxPower ;
@@ -127,7 +127,7 @@ public class DefaultValuesPanel extends JPanel {
     */
    public void setDefaultValues() throws IllegalArgumentException {
       verifyData() ;
-      _band = (Band)_bandComboBox.getSelectedItem() ;
+      _band = (String)_bandComboBox.getSelectedItem() ;
       _mode = (Mode)_modeComboBox.getSelectedItem() ;
       _rst.setRstReceived(_receivedTextField.getText()) ;
       _rst.setRstSent(_sentTextField.getText()) ;

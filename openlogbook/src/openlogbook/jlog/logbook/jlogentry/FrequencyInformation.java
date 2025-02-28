@@ -50,14 +50,14 @@ public interface FrequencyInformation extends Adif {
     * 
     * @return the band.
     */
-   public Band getBand() ;
+   public String getBand() ;
    
    /**
     * Sets the band.  Band.Blank if not used.
     * 
-    * @param band the band
+    * @param _band the band
     */
-   public void setBand(Band band) ;
+   public void setBand(String _band) ;
    
    /**
     * Gets the frequency.  A "" indicates that this field is not in use.
