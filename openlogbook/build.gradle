@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'distribution'
 }
 
 version = '1.0'
@@ -12,56 +13,148 @@ sourceSets {
     }
 }
 
-def libDir = 'lib'
-
 repositories {
     mavenCentral()
-    maven { url "https://repo1.maven.org/maven2/" }  
+    maven { url "https://repo1.maven.org/maven2/" }
     maven { url "https://mvnrepository.com/artifact/skinlf/skinlf" }
 }
 
 dependencies {
     implementation group: 'skinlf', name: 'skinlf', version: '1.2.3'
-
     implementation 'com.formdev:flatlaf:1.6.4'
-    
-
 }
 
 jar {
     archiveBaseName = 'openlogbook'
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    
+
     manifest {
         attributes(
             'Manifest-Version': '1.0',
-            'Main-Class': 'openlogbook.Genesis',
-            'Class-Path': 'lib/skinlf.jar lib/flatlaf-1.6.4.jar'
+            'Main-Class': 'openlogbook.Genesis'
         )
     }
-    
- 
+
     from sourceSets.main.output
     from {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
 }
 
-task copyToLib(type: Copy) {
-    into "$buildDir/libs/lib"
+// Copy JAR dependencies and extra files
+task copyJars(type: Copy) {
     from configurations.runtimeClasspath
-    include '*.jar'
+    into "$buildDir/libs"
 }
 
-task copyIniFile(type: Copy) {
-    from 'src/main/resources'
-    include '*.ini'
-    into "$buildDir/libs"  
+task copyExtraFiles(type: Copy) {
+    from 'lib'
+    include 'New Log Book.adi', 'notepad.dat', 'openlogbook.ini'
+    into "$buildDir/libs"
 }
 
-jar.dependsOn copyToLib
-jar.dependsOn copyIniFile
+// Create a directory for packaging resources
+task copyResourceFiles(type: Copy) {
+    from "$buildDir/libs"
+    include 'New Log Book.adi', 'notepad.dat', 'openlogbook.ini', 'skinlf.jar'
+    into "$buildDir/jpackage/resources"
+}
+
+jar.dependsOn copyJars, copyExtraFiles
 
 application {
     mainClass = 'openlogbook.Genesis'
+}
+
+// Define package settings
+def jpackageBase = "$buildDir/jpackage"
+def appName = "OpenLogbook"
+def appVersion = version
+def vendor = "YourCompany"
+// Task to create a custom JRE using jlink
+task createRuntimeImage(type: Exec) {
+    description = "Creates a custom JRE for the application"
+
+    // Ensure the directory is deleted before running jlink
+    doFirst {
+        delete file(jpackageBase)
+    }
+
+    commandLine 'jlink',
+        '--output', jpackageBase,
+        '--add-modules', 'java.base,java.desktop',
+        '--strip-debug',
+        '--compress', '2',
+        '--no-header-files',
+        '--no-man-pages'
+}
+
+
+// Task to create a custom JRE using jlink
+task createRuntimeImage(type: Exec) {
+    description = "Creates a custom JRE for the application"
+    commandLine 'jlink',
+        '--output', jpackageBase,
+        '--add-modules', 'java.base,java.desktop',
+        '--strip-debug',
+        '--compress', '2',
+        '--no-header-files',
+        '--no-man-pages'
+}
+
+// JPACKAGE FOR RPM (Linux)
+task jpackageRPM(type: Exec) {
+    description = "Builds an RPM package"
+    dependsOn jar, createRuntimeImage, copyResourceFiles
+
+    commandLine 'jpackage',
+        '--type', 'rpm',
+        '--input', "$buildDir/libs",
+        '--main-jar', "${jar.archiveFile.get().asFile.name}",
+        '--main-class', 'openlogbook.Genesis',
+        '--name', appName,
+        '--app-version', appVersion,
+        '--vendor', vendor,
+        '--runtime-image', jpackageBase,
+        '--dest', "$buildDir/dist",
+        '--icon', 'src/main/resources/icon.png',
+        '--resource-dir', "$buildDir/jpackage/resources"
+}
+
+// JPACKAGE FOR MACOS (DMG)
+task jpackageMac(type: Exec) {
+    description = "Builds a macOS DMG package"
+    dependsOn jar, createRuntimeImage, copyResourceFiles
+
+    commandLine 'jpackage',
+        '--type', 'dmg',
+        '--input', "$buildDir/libs",
+        '--main-jar', "${jar.archiveFile.get().asFile.name}",
+        '--main-class', 'openlogbook.Genesis',
+        '--name', appName,
+        '--app-version', appVersion,
+        '--vendor', vendor,
+        '--runtime-image', jpackageBase,
+        '--dest', "$buildDir/dist",
+        '--icon', 'src/main/resources/icon.icns',
+        '--resource-dir', "$buildDir/jpackage/resources"
+}
+
+// JPACKAGE FOR WINDOWS (EXE)
+task jpackageWindows(type: Exec) {
+    description = "Builds a Windows EXE installer"
+    dependsOn jar, createRuntimeImage, copyResourceFiles
+
+    commandLine 'jpackage',
+        '--type', 'exe',
+        '--input', "$buildDir/libs",
+        '--main-jar', "${jar.archiveFile.get().asFile.name}",
+        '--main-class', 'openlogbook.Genesis',
+        '--name', appName,
+        '--app-version', appVersion,
+        '--vendor', vendor,
+        '--runtime-image', jpackageBase,
+        '--dest', "$buildDir/dist",
+        '--icon', 'src/main/resources/icon.ico',
+        '--resource-dir', "$buildDir/jpackage/resources"
 }
