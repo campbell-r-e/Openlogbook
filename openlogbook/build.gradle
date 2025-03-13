@@ -5,6 +5,10 @@ plugins {
 }
 
 version = '1.0'
+def appName = "OpenLogbook"
+def vendor = "YourCompany"
+def copyright = "Copyright © 2024 ${vendor}"
+def appDescription = "OpenLogbook Application"
 
 sourceSets {
     main {
@@ -13,25 +17,69 @@ sourceSets {
     }
 }
 
+def libDir = 'lib'
+
 repositories {
     mavenCentral()
-    maven { url "https://repo1.maven.org/maven2/" }
-    maven { url "https://mvnrepository.com/artifact/skinlf/skinlf" }
+    maven {
+        url "https://mvnrepository.com/artifact/skinlf/skinlf"
+    }
+    
+    flatDir {
+        dirs libDir
+    }
 }
 
 dependencies {
-    implementation group: 'skinlf', name: 'skinlf', version: '1.2.3'
+    implementation group: 'skinlf', name: 'skinlf', version: '1.2.3' // This includes skinlf
     implementation 'com.formdev:flatlaf:1.6.4'
 }
 
+def userDataDir = {
+    if (System.getProperty('os.name').toLowerCase().contains('mac')) {
+        return '~/Library/Application Support/OpenLogbook'
+    } else if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        return '%APPDATA%\\OpenLogbook'
+    } else {
+        return '~/.openlogbook'
+    }
+}()
+
+// Separate resources into app files and user files
+task copyAppResources(type: Copy) {
+    from 'src/main/resources'
+    from 'lib'
+    include 'themes/**'
+    into "$buildDir/resources"
+}
+
+task copyUserResources(type: Copy) {
+    from 'src/main/resources'
+    include 'openlogbook.ini', 'notepad.dat', '*.adi'
+    into "$buildDir/user-resources"
+}
+
+task copyToLib(type: Copy) {
+    from configurations.runtimeClasspath
+    from "$libDir/skinlf.jar"
+    include '*.jar'
+    into "$buildDir/libs/lib"
+}
+
+task prepareResources {
+    dependsOn copyAppResources, copyUserResources, copyToLib
+}
+
 jar {
+    dependsOn prepareResources
     archiveBaseName = 'openlogbook'
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     manifest {
         attributes(
             'Manifest-Version': '1.0',
-            'Main-Class': 'openlogbook.Genesis'
+            'Main-Class': 'openlogbook.Genesis',
+            'Class-Path': 'lib/skinlf.jar lib/flatlaf-1.6.4.jar'
         )
     }
 
@@ -41,120 +89,205 @@ jar {
     }
 }
 
-// Copy JAR dependencies and extra files
-task copyJars(type: Copy) {
-    from configurations.runtimeClasspath
-    into "$buildDir/libs"
-}
-
-task copyExtraFiles(type: Copy) {
-    from 'lib'
-    include 'New Log Book.adi', 'notepad.dat', 'openlogbook.ini'
-    into "$buildDir/libs"
-}
-
-// Create a directory for packaging resources
-task copyResourceFiles(type: Copy) {
-    from "$buildDir/libs"
-    include 'New Log Book.adi', 'notepad.dat', 'openlogbook.ini', 'skinlf.jar'
-    into "$buildDir/jpackage/resources"
-}
-
-jar.dependsOn copyJars, copyExtraFiles
-
-application {
-    mainClass = 'openlogbook.Genesis'
-}
-
-// Define package settings
-def jpackageBase = "$buildDir/jpackage"
-def appName = "OpenLogbook"
-def appVersion = version
-def vendor = "YourCompany"
-// Task to create a custom JRE using jlink
 task createRuntimeImage(type: Exec) {
-    description = "Creates a custom JRE for the application"
-
-    // Ensure the directory is deleted before running jlink
+    dependsOn jar, copyAppResources
+    
     doFirst {
-        delete file(jpackageBase)
+        delete "$buildDir/image"
     }
 
     commandLine 'jlink',
-        '--output', jpackageBase,
-        '--add-modules', 'java.base,java.desktop',
-        '--strip-debug',
-        '--compress', '2',
-        '--no-header-files',
-        '--no-man-pages'
+            '--output', "$buildDir/image",
+            '--add-modules', 'java.base,java.desktop,java.logging',
+            '--strip-debug',
+            '--compress', '2',
+            '--no-header-files',
+            '--no-man-pages'
 }
 
-
-// Task to create a custom JRE using jlink
-task createRuntimeImage(type: Exec) {
-    description = "Creates a custom JRE for the application"
-    commandLine 'jlink',
-        '--output', jpackageBase,
-        '--add-modules', 'java.base,java.desktop',
-        '--strip-debug',
-        '--compress', '2',
-        '--no-header-files',
-        '--no-man-pages'
-}
-
-// JPACKAGE FOR RPM (Linux)
-task jpackageRPM(type: Exec) {
-    description = "Builds an RPM package"
-    dependsOn jar, createRuntimeImage, copyResourceFiles
-
+task packageWindows(type: Exec) {
+    dependsOn createRuntimeImage
+    
+    onlyIf { System.getProperty('os.name').toLowerCase().contains('windows') }
+    
+    doFirst {
+        file("$buildDir/resources/setup.bat").text = """
+            @echo off
+            if not exist "%APPDATA%\\OpenLogbook" mkdir "%APPDATA%\\OpenLogbook"
+            xcopy /Y /Q "$buildDir/user-resources\\*" "%APPDATA%\\OpenLogbook\\"
+        """.stripIndent()
+    }
+    
     commandLine 'jpackage',
-        '--type', 'rpm',
-        '--input', "$buildDir/libs",
-        '--main-jar', "${jar.archiveFile.get().asFile.name}",
-        '--main-class', 'openlogbook.Genesis',
-        '--name', appName,
-        '--app-version', appVersion,
-        '--vendor', vendor,
-        '--runtime-image', jpackageBase,
-        '--dest', "$buildDir/dist",
-        '--icon', 'src/main/resources/icon.png',
-        '--resource-dir', "$buildDir/jpackage/resources"
+            '--type', 'exe',
+            '--name', appName,
+            '--app-version', version,
+            '--vendor', vendor,
+            '--copyright', copyright,
+            '--description', appDescription,
+            '--input', "$buildDir/libs",
+            '--dest', "$buildDir/dist",
+            '--main-jar', "${jar.archiveFileName}",
+            '--main-class', 'openlogbook.Genesis',
+            '--runtime-image', "$buildDir/image",
+            '--icon', 'src/main/resources/icon.ico',
+            '--resource-dir', "$buildDir/resources",
+            '--arguments', "%APPDATA%\\OpenLogbook",
+            '--win-dir-chooser',
+            '--win-menu',
+            '--win-shortcut',
+            '--win-per-user-install',
+            '--install-dir', "OpenLogbook"
 }
 
-// JPACKAGE FOR MACOS (DMG)
-task jpackageMac(type: Exec) {
-    description = "Builds a macOS DMG package"
-    dependsOn jar, createRuntimeImage, copyResourceFiles
+task packageMac(type: Exec) {
+    dependsOn jar, createRuntimeImage, copyToLib
+    
+    onlyIf { System.getProperty('os.name').toLowerCase().contains('mac') }
+    
+    doFirst {
+        // Check if icon exists
+        def iconFile = file('src/main/resources/icon.icns')
+        if (!iconFile.exists()) {
+            println "Warning: icon.icns not found, packaging without custom icon"
+            args.removeIf { it.contains('--icon') }
+            args.removeIf { it.endsWith('.icns') }
+        }
+        
+        // Ensure jar exists
+        def jarFile = new File(buildDir, "libs/${jar.archiveFileName.get()}")
+        if (!jarFile.exists()) {
+            throw new GradleException("Main jar file not found: ${jarFile.absolutePath}")
+        }
 
-    commandLine 'jpackage',
+        // Create default user data directory structure
+        file("$buildDir/user-resources").mkdirs()
+        
+        // Create scripts for first-run setup
+        file("$buildDir/resources/setup.sh").text = """
+            #!/bin/bash
+            USER_DATA_DIR="\${HOME}/Library/Application Support/OpenLogbook"
+            mkdir -p "\${USER_DATA_DIR}"
+            cp -n "$buildDir/user-resources"/* "\${USER_DATA_DIR}/"
+            chmod 644 "\${USER_DATA_DIR}"/*
+        """.stripIndent()
+        
+        file("$buildDir/resources/setup.sh").setExecutable(true)
+    }
+    
+    def args = [
         '--type', 'dmg',
-        '--input', "$buildDir/libs",
-        '--main-jar', "${jar.archiveFile.get().asFile.name}",
-        '--main-class', 'openlogbook.Genesis',
         '--name', appName,
-        '--app-version', appVersion,
+        '--app-version', version,
         '--vendor', vendor,
-        '--runtime-image', jpackageBase,
+        '--copyright', copyright,
+        '--description', appDescription,
+        '--input', "$buildDir/libs",
         '--dest', "$buildDir/dist",
-        '--icon', 'src/main/resources/icon.icns',
-        '--resource-dir', "$buildDir/jpackage/resources"
+        '--main-jar', jar.archiveFileName.get(),
+        '--main-class', 'openlogbook.Genesis',
+        '--runtime-image', "$buildDir/image",
+        '--resource-dir', "$buildDir/resources",
+        '--mac-package-name', appName,
+        '--mac-package-identifier', 'com.yourcompany.openlogbook',
+        '--arguments', "\${HOME}/Library/Application Support/OpenLogbook"
+    ]
+
+    // Only add signing options if certificate is available
+    if (project.hasProperty('macSigningKeyUserName')) {
+        args.addAll([
+            '--mac-sign',
+            '--mac-signing-key-user-name', project.property('macSigningKeyUserName'),
+            '--mac-signing-keychain', project.hasProperty('macSigningKeychain') ? 
+                project.property('macSigningKeychain') : 
+                System.getProperty('user.home') + '/Library/Keychains/login.keychain-db'
+        ])
+    }
+
+    commandLine(['jpackage'] + args)
 }
 
-// JPACKAGE FOR WINDOWS (EXE)
-task jpackageWindows(type: Exec) {
-    description = "Builds a Windows EXE installer"
-    dependsOn jar, createRuntimeImage, copyResourceFiles
+task packageLinux(type: Exec) {
+    dependsOn jar, createRuntimeImage, copyToLib
+    
+    onlyIf { System.getProperty('os.name').toLowerCase().contains('linux') }
+    
+    doFirst {
+        // Check if icon exists
+        def iconFile = file('src/main/resources/icon.png')
+        if (!iconFile.exists()) {
+            println "Warning: icon.png not found, packaging without custom icon"
+            args.removeIf { it contains('--icon') }
+            args.removeIf { it endsWith('.png') }
+        }
+        
+        // Ensure jar exists
+        def jarFile = new File(buildDir, "libs/${jar.archiveFileName.get()}")
+        if (!jarFile.exists()) {
+            throw new GradleException("Main jar file not found: ${jarFile.absolutePath}")
+        }
 
+        // Create default user data directory structure
+        file("$buildDir/user-resources").mkdirs()
+        
+        // Create first-run setup script
+        file("$buildDir/resources/setup.sh").text = """
+            #!/bin/bash
+            USER_DATA_DIR="\${HOME}/.config/openlogbook"
+            mkdir -p "\${USER_DATA_DIR}"
+            
+            # Copy default configuration and data files if they don't exist
+            for file in "$buildDir/user-resources"/*; do
+                basename="\$(basename "\$file")"
+                if [ ! -f "\${USER_DATA_DIR}/\${basename}" ]; then
+                    cp "\$file" "\${USER_DATA_DIR}/"
+                    chmod 644 "\${USER_DATA_DIR}/\${basename}"
+                fi
+            done
+            
+            # Create themes directory if it doesn't exist
+            mkdir -p "\${USER_DATA_DIR}/themes"
+        """.stripIndent()
+        
+        file("$buildDir/resources/setup.sh").setExecutable(true)
+    }
+    
     commandLine 'jpackage',
-        '--type', 'exe',
-        '--input', "$buildDir/libs",
-        '--main-jar', "${jar.archiveFile.get().asFile.name}",
-        '--main-class', 'openlogbook.Genesis',
-        '--name', appName,
-        '--app-version', appVersion,
-        '--vendor', vendor,
-        '--runtime-image', jpackageBase,
-        '--dest', "$buildDir/dist",
-        '--icon', 'src/main/resources/icon.ico',
-        '--resource-dir', "$buildDir/jpackage/resources"
+            '--type', 'rpm',
+            '--name', appName.toLowerCase(),
+            '--app-version', version,
+            '--vendor', vendor,
+            '--copyright', copyright,
+            '--description', appDescription,
+            '--input', "$buildDir/libs",
+            '--dest', "$buildDir/dist",
+            '--main-jar', jar.archiveFileName.get(),
+            '--main-class', 'openlogbook.Genesis',
+            '--runtime-image', "$buildDir/image",
+            '--resource-dir', "$buildDir/resources",
+            '--arguments', "\${HOME}/.config/openlogbook",
+            '--linux-menu-group', 'Office',
+            '--linux-shortcut',
+            '--linux-package-name', appName.toLowerCase(),
+            '--linux-app-category', 'Office',
+            '--linux-rpm-license-type', 'MIT',
+            '--linux-app-release', '1',
+            '--linux-shortcut-name', appName,
+            '--install-dir', "/opt/${appName.toLowerCase()}"
+}
+
+// Renamed from 'package' to 'packageAll'
+task packageAll {
+    dependsOn packageWindows, packageMac, packageLinux
+    doLast {
+        println "Package created in $buildDir/dist"
+    }
+}
+
+// Remove the circular dependencies
+jar.dependsOn prepareResources
+packageAll.dependsOn jar
+
+application {
+    mainClass = 'openlogbook.Genesis'
 }
